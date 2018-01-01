@@ -1,9 +1,16 @@
+import argparse
 from bs4 import BeautifulSoup
 import sys
 from urllib.request import urlopen
 import pickle
 
-critics = ["rex-reed", "anthony-lane"]
+# parse command line args
+parser = argparse.ArgumentParser(description='Curate Rotten Tomatoes ratings based on chosen critics')
+parser.add_argument('critics', nargs='+',
+                   help='the critics\' usernames on Rotten Tomatoes (e.g. rex-reed)')
+
+args = parser.parse_args()
+critics = args.critics
 
 for critic in critics:
     criticUrl = "https://www.rottentomatoes.com/critic/" + critic + "/movies?page="
@@ -96,6 +103,7 @@ for rating in ratings:
     ratingsTmp.append({k.lower(): v for k, v in rating.items()})
 
 ratings = ratingsTmp
+
 
 def calculateCombinedRating(movieName):
     counter = 0
