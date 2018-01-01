@@ -1,25 +1,35 @@
 # critic-tomatoes
-Curated Rotten Tomatoes ratings based on chosen critics. Open up critic-tomoatoes.py and add/change the urls of your critics, then run the script with `python3 critic-tomatoes.py`. This will create a database of ratings for each of your critics. To update the database, just run `python3 critic-tomatoes.py` and it will fetch the first page of ratings and add it to the pre-existing database. 
+Curated Rotten Tomatoes ratings based on chosen critics.
 
-The code is very low quality right now. Run `python3 reader.py` after generating the database (and make sure to change the filenames in `reader.py`) to show an average rating of each of the movies that both critics reviewed.
+[![Updates](https://pyup.io/repos/github/Decagon/critic-tomatoes/shield.svg)](https://pyup.io/repos/github/Decagon/critic-tomatoes/) [![Python 3](https://pyup.io/repos/github/Decagon/critic-tomatoes/python-3-shield.svg)](https://pyup.io/repos/github/Decagon/critic-tomatoes/)
 
-## Sample Output
 
 ```
-De rouille et d'os (Rust and Bone): 0.0%
-Jersey Boys: 75.0%
-The Kids Are All Right: 75.0%
-Nancy Drew: 0.0%
-The Danish Girl: 100.0%
-Blue Valentine: 0.0%
-The Shape of Water: 25.0%
-Birdman: 25.0%
-Mission: Impossible III: 0.0%
-Logan Lucky: 25.0%
-The Humbling: 25.0%
-The Two Faces of January: 70.0%
-Albert Nobbs: 50.0%
-The Best of Youth (La meglio gioventù): 0.0%
+usage: critic-tomatoes.py [-h] critics [critics ...]
+
+Curate Rotten Tomatoes ratings based on chosen critics
+
+positional arguments:
+  critics     the critics' usernames on Rotten Tomatoes (e.g. rex-reed)
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+## Sample usage
+
+To search for curated ratings for `rex-reed` and `anthony-lane` (those Rotten Tomatoes's critics), run `python3 critic-tomatoes.py rex-reed anthony-lane`. After the database file has been downloaded, you will recieve a prompt to enter in a movie name. Type in a movie name, press enter, and it will show the curated rating from each critic, and the combined rating. Want more critics? Add as many as you'd like.
+
+```
+decagon@server:~$ python3 critic-tomatoes.py rex-reed anthony-lane
+Loading rex-reed's review page 1 of 1...
+Saving database...
+Loading anthony-lane's review page 1 of 1...
+Saving database...
+Enter a movie name (press Ctrl-C to quit; type 'show all movies' to show all movies reviewed by all critics): insomnia
+rex-reed rated insomnia: 0.0
+anthony-lane rated insomnia: 0.0
+Combined rating: 0.0
 ```
 
 Inspired by this Reddit thread: https://www.reddit.com/r/Lightbulb/comments/7lywl1/the_ability_to_favorite_or_subscribe_to_reviewers/
