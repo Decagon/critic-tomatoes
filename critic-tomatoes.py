@@ -1,132 +1,86 @@
 import argparse
+import urllib.request
+
 from bs4 import BeautifulSoup
-import sys
-from urllib.request import urlopen
-import pickle
+import stringcase
 
-# parse command line args
-parser = argparse.ArgumentParser(description='Curate Rotten Tomatoes ratings based on chosen critics')
-parser.add_argument('critics', nargs='+',
-                   help='the critics\' usernames on Rotten Tomatoes (e.g. rex-reed)')
 
-args = parser.parse_args()
-critics = args.critics
+def __main__():
+    # parse command line args
+    parser = argparse.ArgumentParser(description='Curate Rotten Tomatoes ratings based on chosen critics')
+    parser.add_argument('critics', nargs='+',
+                        help='the critics\' usernames on Rotten Tomatoes (e.g. rex-reed)')
 
-for critic in critics:
-    criticUrl = "https://www.rottentomatoes.com/critic/" + critic + "/movies?page="
+    args = parser.parse_args()
+    critics = args.critics
+    critic_reviews = {}
+    for critic in critics:
+        critic_reviews[critic] = get_critic_reviews(critic)
 
-    # find the database file, if it exists
-    dbExists = False
-    try:
-        criticRatings = pickle.load(open(critic + ".pickle", "rb"))
-        dbExists = True
-    except Exception:
-        criticRatings = {}
-        dbExists = False
+    while True:
+        query = input("What is the title of the movie? (press Ctrl+C to quit) ")
+        for reviewer in critic_reviews.keys():
+            reviews = critic_reviews[reviewer]
+            for review in reviews:
+                title = review[1]
+                score = review[0]
+                if query.lower().strip() in title.lower():
+                    print(f"{reviewer} rated {stringcase.titlecase(title)} a score of {score*100}%")
 
-    r = urlopen(criticUrl + "1").read()
+
+def get_critic_reviews(critic):
+    """
+    Downloads reviews for a critic
+    :param critic: The critic to get reviews from
+    """
+    critic_url: str = f"https://www.rottentomatoes.com/critic/{critic}/movies?page="
+    reviews = []
+    page: int = 1
+    while True:
+        print(f"Downloading page {page}...")
+        review_html = urllib.request.urlopen(critic_url + str(page)).read()
+        review_page = download_reviews(review_html)
+        if len(review_page) == 0:
+            break
+        reviews.extend(review_page)
+        page += 1
+    return reviews
+
+
+def get_review_score(review):
+    """
+    Parses a n/p review into a float
+    :param review: The review to parse
+    :return: A float representing the fractional review score
+    """
+    score = review.find("td").text.strip()
+    if len(score) != 0:
+        try:
+            return int(score.split("/")[0]) / float(score.split("/")[1])
+        except ValueError:
+            return 0
+    else:
+        return 1 if 'fresh' in review.find("td").find("span").get('class') else 0
+
+
+def download_reviews(r):
+    """
+    Returns a list of reviews for a page (score and link)
+    :param r: The review html to parse
+    :return: A score and link for each review
+    """
     soup = BeautifulSoup(r, "lxml")
-
-    # find how many pages this reviewer has
-    stopPage = soup.find("section", {"class": "panel panel-rt panel-box scrollable-table"}).find(
-        "ul", {"class": "pagination"}).findAll("a")[4].get("href")
-    stopPageInt = int(stopPage.split("=")[1])
-    counter = 0
-
-    # assuming that only one page of reviews has been added since the last time
-    if (dbExists):
-        # wasteful since this should be checked earlier
-        stopPageInt = 1
-    # bit of a waste since the first page is captured twice
-    # keep scraping until we reach the end (since RT doesn't have 404's when we hit the end)
-    while (counter < stopPageInt):
-        counter = counter + 1
-        print("Loading " + critic + "'s review page " +
-              str(counter) + " of " + str(stopPageInt) + "...")
-        # might contain duplicate ratings (how to fix?)
-        r = urlopen(criticUrl + str(counter)).read()
-        soup2 = BeautifulSoup(r, "lxml")
-        mydivs = soup2.findAll("table", {"class": "table table-striped"})
-        for div in mydivs:
-            for tr in div.findAll("tr"):
-                rating = tr.find("span")
-                if (rating is None):
-                    continue
-
-                # sometimes there will be no rating, just a tomato or splat
-                # so give the splats a zero score, and a tomato a one
-                if (rating["title"] == ""):
-                    if (rating["class"] == "icon tiny fresh"):
-                        rating = "1/1"
-                    else:
-                        rating = "0/1"
-                else:
-                    rating = rating["title"]
-
-                try:
-                    movie = tr.find("a").contents[0]
-                    if (movie is not None):
-                        criticRatings[str(tr.find("a").contents[0])] = str(
-                            rating)
-                except IndexError:
-                    pass
-    print("Saving database...")
-    pickle.dump(criticRatings, open(critic + ".pickle", "wb"))
+    review_bodies = soup.find("tbody", {"id": "review-table-body"})
+    reviews = review_bodies.find_all("tr")
+    completed_reviews = []
+    if len(reviews) == 0:
+        return []
+    for review in reviews:
+        score = get_review_score(review)
+        link = review.find("a").get('href')
+        title = link.split('/')[-1].replace('_', ' ')
+        completed_reviews.append((score, title, link))
+    return completed_reviews
 
 
-# show user interactive prompt to search for movies and their ratings
-ratings = []
-
-for critic in critics:
-    ratings.append(pickle.load(open(critic + ".pickle", "rb")))
-
-
-def parseDivide(inputVal):
-    inputVal = inputVal.split("/")
-    numerator = inputVal[0]
-    denominator = inputVal[1]
-    return str(float(numerator) / float(denominator))
-
-
-moviesAllReviewed = ratings[0]
-
-counter = 1
-while (counter < len(ratings)):
-    moviesAllReviewed = moviesAllReviewed & ratings[counter].keys()
-    counter = counter + 1
-
-# lowercase all movies to help with searching
-moviesAllReviewed = [x.lower() for x in moviesAllReviewed]
-
-ratingsTmp = []
-for rating in ratings:
-    ratingsTmp.append({k.lower(): v for k, v in rating.items()})
-
-ratings = ratingsTmp
-
-
-def calculateCombinedRating(movieName):
-    counter = 0
-    movieName = movieName.lower()
-    localRatings = []
-    while (counter < len(ratings)):
-        criticRating = parseDivide(ratings[counter][movieName])
-        print(critics[counter] + " rated " +
-              movieName + ": " + str(criticRating))
-        counter = counter + 1
-        localRatings.append(float(criticRating))
-
-    combinedRating = sum(localRatings) / len(localRatings)
-    print("Combined rating: " + str(round(combinedRating, 2)))
-
-
-while True:
-    try:
-        response = input(
-            "Enter a movie name (press Ctrl-C to quit; type 'show all movies' to show all movies reviewed by all critics):")
-        if (response == "show all movies"):
-            print(moviesAllReviewed)
-        else:
-            calculateCombinedRating(response)
-    except KeyError:
-        print("Movie was not reviewed by all critics.")
+__main__()
